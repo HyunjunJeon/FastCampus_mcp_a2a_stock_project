@@ -127,33 +127,39 @@ Human-in-the-Loop 승인이 필요한 경우 명확한 리스크 분석을 제�
             "error": "Trading execution timeout after 120 seconds",
             "messages": [],
         }
-
-        # 5. 결과 출력
-        print_section("거래 결과")
-
-        if isinstance(result, dict) and result.get("success"):
-            print("거래 프로세스 완료!")
-
-            trading_result = result.get("result", {})
-
-            #  도구 호출 검증 로직 추가
-            tool_calls = trading_result.get("tool_calls_made", 0)
-            print("\n도구 호출 검증:")
-            print(f"  - 도구 호출 횟수: {tool_calls}회")
-
-        # 6. 전체 결과를 JSON 파일로 저장
-        output_dir = Path("../../logs/examples/langgraph")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / get_result_filename("trading_result")
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
-        print(f"\n전체 결과가 {output_file}에 저장되었습니다.")
-
     except Exception as e:
         print(f"\n실행 중 오류 발생: {str(e)}")
         import traceback
 
         traceback.print_exc()
+        result = {
+            "success": False,
+            "error": str(e),
+            "messages": [],
+        }
+
+    # 5. 결과 출력
+    print_section("거래 결과")
+
+    if isinstance(result, dict) and result.get("success"):
+        print("거래 프로세스 완료!")
+
+        trading_result = result.get("result", {})
+
+        # 도구 호출 검증 로직 추가
+        tool_calls = trading_result.get("tool_calls_made", 0)
+        print("\n도구 호출 검증:")
+        print(f"  - 도구 호출 횟수: {tool_calls}회")
+    elif isinstance(result, dict):
+        print(f"거래 실패: {result.get('error', 'Unknown error')}")
+
+    # 6. 전체 결과를 JSON 파일로 저장
+    output_dir = Path("../../logs/examples/langgraph")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / get_result_filename("trading_result")
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    print(f"\n전체 결과가 {output_file}에 저장되었습니다.")
 
     print_section("테스트 완료")
 
