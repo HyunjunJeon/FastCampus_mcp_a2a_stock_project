@@ -28,6 +28,7 @@ COPY src ./src
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 ENV MCP_PORT=9000
+ENV PATH="/app/.venv/bin:$PATH"
 
 # 실행 사용자 생성 (보안)
 RUN adduser --disabled-password --gecos '' appuser && \

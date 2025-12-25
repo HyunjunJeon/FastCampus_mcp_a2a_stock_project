@@ -3,9 +3,7 @@
 **멀티 에이전트 A2A 기반 주식 투자 시스템**으로,  
 실시간 데이터 수집부터 리스크 관리, Human-in-the-Loop 까지 구성합니다.
 
----
-
-![fc_lecture.png](fc_lecture.png)  
+[제 강의 전용 할인 페이지](https://fastcampus.co.kr/secret_online_jhjagent)
 
 ---
 
@@ -237,6 +235,44 @@ ECOS_API_KEY=your_ecos_api_key
 
 # DART(금융감독원 전자공시시스템) API
 DART_API_KEY=your_dart_api_key
+```
+
+---
+
+## 변경 이력 (Changelog)
+
+### v2.1.0 (2025-12-26) - A2A 입력 정규화 개선
+
+#### 버그 수정
+
+- **DataCollector A2A 입력 처리 버그 수정**
+  - A2A 프로토콜의 DataPart 형식 입력이 LangGraph 메시지 형식으로 자동 변환되지 않던 문제 해결
+  - `_normalize_input()` 메서드 추가로 구조화된 입력(symbols, data_types, user_question)을 자동 변환
+  - A2A 통합 테스트 성공률 25% → 50% 개선 (DataCollector + Analysis 정상 동작)
+
+#### Deprecated
+
+- `DataCollectorA2AAgent.collect_data()` 메서드
+  - 대신 `execute_for_a2a()`를 직접 사용 권장
+  - `execute_for_a2a()`가 `_normalize_input()`을 통해 동일한 변환을 자동 수행
+
+#### 변경된 파일
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/a2a_agents/data_collector/data_collector_agent_a2a_v2.py` | `_normalize_input()` 추가, `execute_for_a2a()` 수정, `collect_data()` deprecated |
+
+#### 🔧 기술적 세부사항
+
+```python
+# 이전: A2A DataPart가 그대로 전달되어 LangGraph가 이해하지 못함
+input_dict = {"requested_symbols": ["005930"], "data_types": ["price"]}
+result = await graph.ainvoke(input_dict)  # ❌ 실패
+
+# 이후: _normalize_input()이 자동 변환
+normalized = _normalize_input(input_dict)
+# → {"messages": [HumanMessage(content="다음 종목들의 데이터를 수집해주세요: 005930...")]}
+result = await graph.ainvoke(normalized)  # ✅ 성공
 ```
 
 ---

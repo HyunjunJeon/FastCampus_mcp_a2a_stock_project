@@ -40,12 +40,7 @@ class DataCollectorA2AAgent(BaseA2AAgent):
     스트리밍/폴링 작업 모두에 대해 표준화된 A2A 출력을 제공합니다.
     """
 
-    def __init__(
-        self,
-        model=None,
-        is_debug: bool = False,
-        checkpointer=None
-    ):
+    def __init__(self, model=None, is_debug: bool = False, checkpointer=None):
         """
         데이터 수집 A2A 에이전트 초기화.
 
@@ -56,10 +51,9 @@ class DataCollectorA2AAgent(BaseA2AAgent):
         """
         BaseA2AAgent.__init__(self)
 
+        self.is_debug = is_debug
         self.model = model or init_chat_model(
-            model="gpt-4.1",
-            temperature=0,
-            model_provider="openai"
+            model="gpt-4.1", temperature=0, model_provider="openai"
         )
         self.checkpointer = checkpointer or MemorySaver()
 
@@ -89,10 +83,11 @@ class DataCollectorA2AAgent(BaseA2AAgent):
             logger.info(f" Loaded {len(self.tools)} MCP tools for DataCollector")
 
             # Get system prompt
-            system_prompt = get_prompt("data_collector", "system", tool_count=len(self.tools))
+            system_prompt = get_prompt(
+                "data_collector", "system", tool_count=len(self.tools)
+            )
 
             # Create the reactive agent graph
-            config = RunnableConfig(recursion_limit=10)
             self.graph = create_react_agent(
                 model=self.model,
                 tools=self.tools,
@@ -100,7 +95,6 @@ class DataCollectorA2AAgent(BaseA2AAgent):
                 checkpointer=self.checkpointer,
                 name="DataCollectorAgent",
                 debug=self.is_debug,
-                context_schema=config
             )
 
             logger.info(" DataCollector A2A Agent initialized successfully")
@@ -110,16 +104,14 @@ class DataCollectorA2AAgent(BaseA2AAgent):
             raise RuntimeError(f"DataCollector Agent initialization failed: {e}") from e
 
     async def execute_for_a2a(
-        self,
-        input_dict: Dict[str, Any],
-        config: Optional[Dict[str, Any]] = None
+        self, input_dict: Dict[str, Any], config: Optional[Dict[str, Any]] = None
     ) -> A2AOutput:
         """
         A2A 호환 입력/출력으로 에이전트를 실행합니다.
 
         Args:
             input_dict: ``{"messages": [...]}`` 형태의 페이로드 또는 구조화된 수집 요청.
-                메시지는 LangChain 메시지 객체를 사용합니다.
+                A2A DataPart 형식도 자동으로 변환하여 처리합니다.
             config: 선택적 실행 설정. 제공되지 않으면 기본 ``thread_id`` 가 설정됩니다.
 
         Returns:
@@ -129,15 +121,18 @@ class DataCollectorA2AAgent(BaseA2AAgent):
             await self.initialize()
 
         try:
+            # 입력 형식 정규화 (A2A DataPart → LangGraph 메시지 형식)
+            normalized_input = self._normalize_input(input_dict)
+
             # Reset tracking variables
             self.collected_symbols.clear()
             self.tool_calls_count = 0
 
-            # Execute the graph
-            result = await self.graph.ainvoke(
-                input_dict,
-                config=config or {"configurable": {"thread_id": str(uuid4())}},
-            )
+            # Execute the graph with normalized input
+            config_to_use = config
+            if config_to_use is None or isinstance(config_to_use, dict):
+                config_to_use = RunnableConfig(configurable={"thread_id": str(uuid4())})
+            result = await self.graph.ainvoke(normalized_input, config=config_to_use)
 
             logger.info(f"[DataCollectorA2AAgent] Result: {result}")
 
@@ -147,10 +142,7 @@ class DataCollectorA2AAgent(BaseA2AAgent):
         except Exception as e:
             return self.format_error(e, context="execute_for_a2a")
 
-    def format_stream_event(
-        self,
-        event: Dict[str, Any]
-    ) -> Optional[A2AOutput]:
+    def format_stream_event(self, event: Dict[str, Any]) -> Optional[A2AOutput]:
         """LangGraph 스트리밍 이벤트를 ``A2AOutput`` 업데이트로 변환합니다.
 
         너무 작은 토큰 조각으로 버퍼에 남아 있는 경우에는 ``None`` 을 반환합니다.
@@ -166,7 +158,7 @@ class DataCollectorA2AAgent(BaseA2AAgent):
                     status="working",
                     text_content=self.stream_buffer.flush(),
                     stream_event=True,
-                    metadata={"event_type": "llm_stream"}
+                    metadata={"event_type": "llm_stream"},
                 )
 
         # Handle tool execution events
@@ -187,8 +179,8 @@ class DataCollectorA2AAgent(BaseA2AAgent):
                 metadata={
                     "event_type": "tool_start",
                     "tool_name": tool_name,
-                    "tool_call_number": self.tool_calls_count
-                }
+                    "tool_call_number": self.tool_calls_count,
+                },
             )
 
         # Handle tool completion
@@ -202,10 +194,10 @@ class DataCollectorA2AAgent(BaseA2AAgent):
                     data_content={
                         "tool_result": tool_output,
                         "symbols_collected": list(self.collected_symbols),
-                        "tool_calls_made": self.tool_calls_count
+                        "tool_calls_made": self.tool_calls_count,
                     },
                     stream_event=True,
-                    metadata={"event_type": "tool_end"}
+                    metadata={"event_type": "tool_end"},
                 )
 
         # Handle completion events
@@ -216,15 +208,12 @@ class DataCollectorA2AAgent(BaseA2AAgent):
                     status="working",
                     text_content=self.stream_buffer.flush(),
                     stream_event=True,
-                    metadata={"event_type": "buffer_flush"}
+                    metadata={"event_type": "buffer_flush"},
                 )
 
         return None
 
-    def extract_final_output(
-        self,
-        state: Dict[str, Any]
-    ) -> A2AOutput:
+    def extract_final_output(self, state: Dict[str, Any]) -> A2AOutput:
         """LangGraph 실행 상태로부터 최종 ``A2AOutput`` 을 생성합니다.
 
         후속 처리를 쉽게 하기 위해 카운터 및 타임스탬프를 포함합니다.
@@ -251,10 +240,10 @@ class DataCollectorA2AAgent(BaseA2AAgent):
                     "symbols_collected": list(self.collected_symbols),
                     "tool_calls_made": self.tool_calls_count,
                     "total_messages_count": total_messages,
-                    "timestamp": datetime.now(pytz.UTC).isoformat()
+                    "timestamp": datetime.now(pytz.UTC).isoformat(),
                 },
                 "agent_type": "DataCollectorA2AAgent",
-                "workflow_status": "completed"
+                "workflow_status": "completed",
             }
 
             # Create final output
@@ -266,8 +255,8 @@ class DataCollectorA2AAgent(BaseA2AAgent):
                 metadata={
                     "execution_complete": True,
                     "symbols_count": len(self.collected_symbols),
-                    "tool_calls_count": self.tool_calls_count
-                }
+                    "tool_calls_count": self.tool_calls_count,
+                },
             )
 
         except Exception as e:
@@ -276,14 +265,69 @@ class DataCollectorA2AAgent(BaseA2AAgent):
 
     # Helper methods for data collection
 
+    def _normalize_input(self, input_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """A2A DataPart 형식을 LangGraph 메시지 형식으로 변환합니다.
+
+        A2A 프로토콜에서 전송되는 구조화된 데이터(DataPart)를 LangGraph가
+        기대하는 ``{"messages": [HumanMessage(...)]}`` 형식으로 변환합니다.
+
+        Args:
+            input_dict: A2A DataPart 또는 메시지 형식의 입력
+
+        Returns:
+            LangGraph 호환 형식의 입력 딕셔너리
+        """
+        # 이미 메시지 형식이면 HumanMessage로 변환하여 반환
+        if "messages" in input_dict:
+            messages = input_dict.get("messages", [])
+            # dict 메시지를 HumanMessage로 변환
+            if messages and isinstance(messages[0], dict):
+                return {
+                    "messages": [
+                        HumanMessage(content=m.get("content", str(m)))
+                        for m in messages
+                    ]
+                }
+            # 이미 HumanMessage 객체면 그대로 반환
+            return input_dict
+
+        # DataPart 구조인 경우 변환
+        symbols = input_dict.get("requested_symbols") or input_dict.get("symbols")
+        data_types = input_dict.get("data_types")
+        user_question = input_dict.get("user_question")
+
+        # 기존 헬퍼 메서드 활용하여 요청 텍스트 생성
+        request = self._build_collection_request(symbols, data_types, user_question)
+
+        logger.info(f"[DataCollector] Normalized input: {request[:100]}...")
+
+        return {"messages": [HumanMessage(content=request)]}
+
     async def collect_data(
         self,
-        symbols: list[str] = None,
+        symbols: list[str] | None = None,
         data_types: list[str] | None = None,
         user_question: str | None = None,
-        context_id: str | None = None
+        context_id: str | None = None,
     ) -> A2AOutput:
         """상위 수준의 데이터 수집 요청을 위한 헬퍼 메서드.
+
+        .. deprecated::
+            이 메서드는 더 이상 사용되지 않습니다. 대신 ``execute_for_a2a()``를
+            직접 호출하세요. ``execute_for_a2a()``는 ``_normalize_input()``을 통해
+            구조화된 입력(symbols, data_types, user_question)을 자동으로 변환합니다.
+
+            사용 예시::
+
+                # 기존 방식 (Deprecated)
+                result = await agent.collect_data(symbols=["005930"], data_types=["price"])
+
+                # 권장 방식
+                result = await agent.execute_for_a2a({
+                    "requested_symbols": ["005930"],
+                    "data_types": ["price"],
+                    "user_question": "삼성전자 데이터를 수집해주세요"
+                })
 
         Args:
             symbols: 대상 종목 코드 (예: ["005930", "000660"])
@@ -294,6 +338,14 @@ class DataCollectorA2AAgent(BaseA2AAgent):
         Returns:
             A2AOutput: 표준화된 수집 결과
         """
+        import warnings
+        warnings.warn(
+            "collect_data()는 deprecated되었습니다. "
+            "execute_for_a2a()를 직접 사용하세요.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+
         # Build the collection request
         request = self._build_collection_request(symbols, data_types, user_question)
 
@@ -307,9 +359,9 @@ class DataCollectorA2AAgent(BaseA2AAgent):
 
     def _build_collection_request(
         self,
-        symbols: list[str] = None,
-        data_types: list[str] = None,
-        user_question: str = None
+        symbols: list[str] | None = None,
+        data_types: list[str] | None = None,
+        user_question: str | None = None,
     ) -> str:
         """에이전트가 데이터를 수집하도록 간결한 한국어 지시문을 생성합니다."""
         if user_question:
@@ -331,9 +383,7 @@ class DataCollectorA2AAgent(BaseA2AAgent):
 
 # Factory function for backward compatibility
 async def create_data_collector_a2a_agent(
-    model=None,
-    is_debug: bool = False,
-    checkpointer=None
+    model=None, is_debug: bool = False, checkpointer=None
 ) -> DataCollectorA2AAgent:
     """
     데이터 수집 A2A 에이전트를 생성하고 초기화합니다.
