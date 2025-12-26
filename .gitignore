@@ -11,10 +11,10 @@ wheels/
 
 # Virtual environments
 .venv/
-venv/
 .python-version
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 
 # Environment variables
 .env
@@ -22,14 +22,11 @@ logs/
 data/
 
 # IDE
-.vscode/
 *coverage*
-
 node_modules/
 
 # AI Tools
 .serena/
-.cursor/
 .claude/
 .mcp.json
 CLAUDE.md

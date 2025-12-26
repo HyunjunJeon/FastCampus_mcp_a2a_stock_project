@@ -2,24 +2,21 @@
 name = "a2a-langgraph-agent-project"
 version = "0.1.0"
 description = "A2A, MCP, LangGraph Agent Integration"
-authors = [
-    {name = "Hyunjun Jeon", email = "jeonhj920@gmail.com"},
-]
-license = {file = "LICENSE"}
+authors = [{ name = "Hyunjun Jeon", email = "jeonhj920@gmail.com" }]
+license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "a2a-sdk[grpc]>=0.3.0",
+    "a2a-sdk[grpc]>=0.3.22",
     "aiohttp>=3.9.0",
     "fastmcp>=2.11.3",
     "finance-datareader>=0.9.96",
     "fredapi>=0.5.2",
     "httpx>=0.28.1",
     "httpx-sse>=0.4.1",
-    "langchain>=0.3.27",
-    "langchain-mcp-adapters>=0.1.9",
+    "langchain>=1.2.0",
+    "langchain-mcp-adapters>=0.2.0",
     "langchain-openai>=0.3.30",
-    "langgraph>=0.6.4",
     "pandas>=2.3.1",
     "psutil>=7.0.0",
     "publicdatareader>=1.1.0",
@@ -60,16 +57,16 @@ include = ["src/**/*.py"]
 
 [tool.ruff.lint]
 select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "C",  # flake8-comprehensions
-    "B",  # flake8-bugbear
+    "E", # pycodestyle errors
+    "W", # pycodestyle warnings
+    "F", # pyflakes
+    "I", # isort
+    "C", # flake8-comprehensions
+    "B", # flake8-bugbear
 ]
 extend-ignore = [
-    "E501",  # Line too long (handled by black)
-    "C901",  # Complex structure (delegated to design)
+    "E501", # Line too long (handled by black)
+    "C901", # Complex structure (delegated to design)
 ]
 
 [tool.coverage.run]
@@ -77,6 +74,4 @@ source = ["src"]
 omit = ["*/tests/*", "*/test_*"]
 
 [dependency-groups]
-dev = [
-    "ipywidgets>=8.1.8",
-]
+dev = ["ipywidgets>=8.1.8"]

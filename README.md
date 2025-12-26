@@ -7,6 +7,79 @@
 
 ---
 
+## Quick Start (개발환경 설정)
+
+> **모든 수강생이 동일한 개발환경을 구성할 수 있도록 `setup.sh` 스크립트를 제공합니다.**
+
+### 1단계: uv 패키지 매니저 설치
+
+[uv](https://docs.astral.sh/uv/)는 Rust로 작성된 초고속 Python 패키지 관리자입니다.
+
+```bash
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# macOS (Homebrew)
+brew install uv
+
+# Windows (PowerShell)
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+설치 후 터미널을 재시작하세요.
+
+### 2단계: 개발환경 자동 설정
+
+```bash
+./setup.sh
+```
+
+이 스크립트는 다음 3가지를 자동으로 수행합니다:
+
+| 단계 | 설명 |
+|------|------|
+| **[1/3] uv 확인** | uv 설치 여부 확인, 미설치 시 안내 후 종료 |
+| **[2/3] 의존성 설치** | `uv sync --frozen` 실행 → `.venv` 생성 및 패키지 설치 |
+| **[3/3] VSCode 설정** | `.vscode/settings.json` 생성 → Python 인터프리터 자동 설정 |
+
+### 3단계: API 키 설정
+
+```bash
+cp .env.example .env
+```
+
+`.env` 파일을 열고 API 키를 입력하세요:
+
+```bash
+OPENAI_API_KEY=your_openai_api_key
+TAVILY_API_KEY=your_tavily_api_key
+SERPER_API_KEY=your_serper_api_key
+```
+
+- [OPENAI_API_KEY 발급](https://platform.openai.com/api-keys)
+- [TAVILY_API_KEY 발급](https://www.tavily.com/)
+- [SERPER_API_KEY 발급](https://serper.dev/)
+
+### 4단계: Docker 환경 시작 (MCP 서버)
+
+```bash
+./docker/mcp_docker.sh build   # 이미지 빌드
+./docker/mcp_docker.sh up      # 서비스 시작
+./docker/mcp_docker.sh test    # 헬스체크
+```
+
+### setup.sh 개별 명령어
+
+```bash
+./setup.sh          # 전체 설정 (기본값)
+./setup.sh uv       # uv 설치 확인만
+./setup.sh sync     # 의존성 설치만
+./setup.sh vscode   # VSCode 설정만
+./setup.sh help     # 도움말
+```
+
+---
+
 ## 주요 구성요소
 
 ### 에이전트 구성
@@ -25,7 +98,7 @@
 
 #### **AnalysisAgent** - 4차원 분석 엔진
 
-- **워크플로우**: 9-노드 분석 파이프라인 (개별분석→통합→권장사항)
+- **워크플로우**: 데이터 분석 파이프라인 (개별분석→통합→권장사항)
 - **핵심 기능**: Technical, Fundamental, Macro, Sentiment 통합 분석
 - **특징**: 카테고리 기반 신호 시스템, 가중평균 통합, 신뢰도 계산
 
@@ -62,7 +135,7 @@
 | **TradingAgent** | trading-domain, portfolio-domain | 주문 실행, 리스크 관리, Human-in-the-loop |
 | **SupervisorAgent** | No direct connections | 워크플로우 조정, Agent 오케스트레이션 |
 
-## 🛠️ 기술 스택
+## 기술 스택
 
 ### **Backend & AI Framework**
 
